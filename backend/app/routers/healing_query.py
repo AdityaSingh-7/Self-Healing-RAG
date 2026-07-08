@@ -85,3 +85,74 @@ async def healing_history(limit: int = 20):
     """View recent healing events."""
     events = get_recent_healing_events(limit=limit)
     return {"events": events}
+
+
+# ==========================================
+# BENCHMARK & COST TRACKING
+# ==========================================
+from app.learning.cost_tracker import get_cost_comparison, get_cost_summary
+from app.learning.benchmark import run_benchmark
+
+
+class BenchmarkRequest(BaseModel):
+    """Request to run a benchmark comparison."""
+    test_questions: list[dict] = Field(
+        min_length=1,
+        max_length=100,
+        description="List of {question: str, ground_truth: str (optional)}",
+    )
+
+
+@router.post("/benchmark")
+async def run_benchmark_comparison(request: BenchmarkRequest, user_id: str = Depends(get_user_id)):
+    """
+    Run the same questions through BOTH pipelines and compare.
+
+    Returns:
+    - Standard RAG accuracy + tokens + latency
+    - Self-Healing RAG accuracy + tokens + latency
+    - Improvement metrics (the interview numbers)
+    - Per-question breakdown
+    """
+    results = await run_benchmark(
+        test_questions=request.test_questions,
+        user_id=user_id,
+    )
+    return results
+
+
+@router.get("/costs")
+async def cost_analysis():
+    """
+    Token usage and cost comparison: standard vs healed queries.
+
+    This answers: "How much more does healing cost, and is it worth it?"
+    """
+    return {
+        "comparison": get_cost_comparison(),
+        "summary": get_cost_summary(),
+    }
+
+
+@router.get("/sample-benchmark")
+async def sample_benchmark_dataset():
+    """
+    Returns a sample benchmark dataset you can use for testing.
+    Replace these with questions relevant to YOUR uploaded documents.
+    """
+    return {
+        "description": "Sample benchmark questions. Upload documents first, then run POST /healing/benchmark with these.",
+        "test_questions": [
+            {"question": "What is the main topic of the document?", "ground_truth": ""},
+            {"question": "What are the key steps described?", "ground_truth": ""},
+            {"question": "Are there any deadlines mentioned?", "ground_truth": ""},
+            {"question": "What tools or technologies are referenced?", "ground_truth": ""},
+            {"question": "Who is the intended audience?", "ground_truth": ""},
+            {"question": "What are the prerequisites?", "ground_truth": ""},
+            {"question": "Is there a troubleshooting section?", "ground_truth": ""},
+            {"question": "What happens if the token expires?", "ground_truth": ""},
+            {"question": "How do I verify the setup is correct?", "ground_truth": ""},
+            {"question": "What are the security considerations?", "ground_truth": ""},
+        ],
+    }
+
