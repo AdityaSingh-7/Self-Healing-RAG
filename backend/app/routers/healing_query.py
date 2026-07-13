@@ -9,7 +9,9 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.dependencies import get_user_id
-from app.pipeline.orchestrator import self_healing_query
+from app.pipeline.orchestrator import advanced_query
+from app.pipeline.bandit import bandit
+from app.pipeline.calibrator import calibrator
 from app.learning.failure_logger import get_healing_summary, get_recent_healing_events, get_strategy_stats
 
 
@@ -21,33 +23,37 @@ class HealingQueryRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     top_k: int = Field(default=5, ge=1, le=20)
     recency_weight: float = Field(default=0.2, ge=0.0, le=1.0)
-    max_attempts: int = Field(default=3, ge=1, le=5, description="Max healing attempts before degradation")
+    max_attempts: int = Field(default=3, ge=1, le=5)
+    use_hyde: bool = Field(default=True, description="Use Hypothetical Document Embedding")
+    use_contrastive: bool = Field(default=True, description="Use Contrastive Retrieval")
+    use_cross_encoder: bool = Field(default=True, description="Use Cross-Encoder Reranking")
+    use_decomposition: bool = Field(default=True, description="Use Query Decomposition for complex questions")
 
 
 @router.post("/ask")
 async def healing_ask(request: HealingQueryRequest, user_id: str = Depends(get_user_id)):
     """
-    Ask a question with self-healing.
+    Ask a question with the FULL advanced pipeline:
 
-    The system:
-    1. Retrieves context and generates an answer
-    2. Validates the answer (confidence scoring via LLM-as-judge)
-    3. If confidence < 0.8: automatically retries with healing strategies
-    4. Returns the best answer + full healing report
-
-    Response includes:
-    - answer: the generated answer
-    - confidence: how confident the system is (0.0-1.0)
-    - healed: whether healing was needed
-    - strategy_used: which strategy fixed it (if healed)
-    - healing_report: full details of each attempt
+    1. Query Decomposition (multi-hop for complex questions)
+    2. HyDE (Hypothetical Document Embedding)
+    3. Multi-strategy retrieval + Reciprocal Rank Fusion
+    4. Contrastive filtering (negative query)
+    5. Cross-Encoder reranking
+    6. LLM answer generation
+    7. Confidence validation + Platt Scaling calibration
+    8. Self-healing with Thompson Sampling strategy selection
     """
-    result = await self_healing_query(
+    result = await advanced_query(
         question=request.question,
         user_id=user_id,
         top_k=request.top_k,
         recency_weight=request.recency_weight,
         max_attempts=request.max_attempts,
+        use_hyde=request.use_hyde,
+        use_contrastive=request.use_contrastive,
+        use_cross_encoder=request.use_cross_encoder,
+        use_decomposition=request.use_decomposition,
     )
 
     return result
@@ -85,6 +91,39 @@ async def healing_history(limit: int = 20):
     """View recent healing events."""
     events = get_recent_healing_events(limit=limit)
     return {"events": events}
+
+
+@router.get("/bandit")
+async def bandit_stats():
+    """
+    Thompson Sampling bandit statistics.
+    Shows the Beta distribution parameters and expected values for each strategy arm.
+    """
+    from app.pipeline.strategies.query_expansion import QueryExpansionStrategy
+    from app.pipeline.strategies.multi_query import MultiQueryStrategy
+    from app.pipeline.strategies.keyword_fallback import KeywordFallbackStrategy
+    from app.pipeline.strategies.broader_retrieval import BroaderRetrievalStrategy
+    from app.pipeline.strategies.chunk_refinement import ChunkRefinementStrategy
+
+    all_strategies = [
+        QueryExpansionStrategy(), MultiQueryStrategy(),
+        KeywordFallbackStrategy(), BroaderRetrievalStrategy(),
+        ChunkRefinementStrategy(),
+    ]
+
+    return {
+        "arm_stats": bandit.get_stats(),
+        "expected_values": bandit.get_expected_values(all_strategies),
+    }
+
+
+@router.get("/calibration")
+async def calibration_info():
+    """
+    Confidence calibration status.
+    Shows whether Platt Scaling is active and how it maps raw → calibrated scores.
+    """
+    return calibrator.get_calibration_info()
 
 
 # ==========================================

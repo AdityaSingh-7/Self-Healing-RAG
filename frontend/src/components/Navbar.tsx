@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signIn, signOut } from "next-auth/react";
-import { MessageSquare, Upload, LogIn, LogOut, FileText } from "lucide-react";
+import { MessageSquare, Upload, LogIn, LogOut, FileText, BarChart3 } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -12,6 +12,7 @@ export function Navbar() {
   const links = [
     { href: "/chat", label: "Chat", icon: MessageSquare },
     { href: "/upload", label: "Upload", icon: Upload },
+    { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   ];
 
   return (
@@ -19,7 +20,7 @@ export function Navbar() {
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2">
         <FileText className="w-6 h-6 text-blue-600" />
-        <span className="font-bold text-lg">RAG System</span>
+        <span className="font-bold text-lg">Self-Healing RAG</span>
       </Link>
 
       {/* Navigation Links */}

@@ -15,7 +15,7 @@ import time
 from app.services.embedder import EmbeddingService
 from app.services.vectorstore import VectorStoreService
 from app.services.llm import LLMService
-from app.pipeline.orchestrator import self_healing_query
+from app.pipeline.orchestrator import advanced_query
 from app.pipeline.validator import validate_answer
 from app.learning.cost_tracker import log_cost
 
@@ -96,7 +96,7 @@ async def run_benchmark(
         # ==========================================
         start = time.time()
 
-        healing_result = await self_healing_query(
+        healing_result = await advanced_query(
             question=question, user_id=user_id, top_k=5, max_attempts=3,
         )
 

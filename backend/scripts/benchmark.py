@@ -23,7 +23,7 @@ sys.path.insert(0, ".")
 from app.services.embedder import EmbeddingService
 from app.services.vectorstore import VectorStoreService
 from app.services.llm import LLMService
-from app.pipeline.orchestrator import self_healing_query
+from app.pipeline.orchestrator import advanced_query
 from app.pipeline.validator import validate_answer
 
 
@@ -84,7 +84,7 @@ async def run_healing_pipeline(question: str, user_id: str) -> dict:
     """Run question through self-healing RAG."""
     start = time.time()
 
-    result = await self_healing_query(
+    result = await advanced_query(
         question=question,
         user_id=user_id,
         top_k=5,
